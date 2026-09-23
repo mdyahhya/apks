@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer CRM & APK Distribution Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="qrcode.min.js"></script>
+</head>
+<body class="crm-layout">
+  <!-- Left Side Navigation Menu (CRM Style) -->
+  <aside class="crm-sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      </div>
+      <div class="sidebar-title">
+        <h2>AppHub CRM</h2>
+        <span class="version-pill">v2.1 Enterprise</span>
+      </div>
+    </div>
+
+    <!-- Navigation List -->
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">MAIN NAVIGATION</div>
+      <a href="#activeRelease" class="nav-item active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <span>Active QR Release</span>
+      </a>
+
+      <a href="#buildHistory" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 8v4l3 3"/>
+          <circle cx="12" cy="12" r="9"/>
+        </svg>
+        <span>Build History</span>
+        <span class="nav-badge" id="navHistoryCount">0</span>
+      </a>
+
+      <a href="#systemLogs" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5"/>
+          <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <span>Watcher Logs</span>
+      </a>
+
+      <div class="nav-section-title">INTEGRATIONS</div>
+      <a href="https://github.com/mdyahhya/app-releases" target="_blank" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+        </svg>
+        <span>GitHub Repository</span>
+      </a>
+    </nav>
+
+    <!-- Sidebar Bottom Status -->
+    <div class="sidebar-footer">
+      <div class="project-info-card">
+        <div class="project-label">ACTIVE MONITORED PROJECT</div>
+        <div class="project-name" id="sidebarProjectName">SINA User Android</div>
+        <div class="project-path" id="sidebarProjectPath">build/app/outputs/flutter-apk/app-release.apk</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main CRM Canvas -->
+  <div class="crm-main-wrapper">
+    <!-- Top Header Bar -->
+    <header class="crm-topbar">
+      <div class="topbar-left">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item">Local CRM</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current">Distribution Hub</span>
+        </div>
+
+        <!-- Project Selector Toggle Dropdown -->
+        <div class="project-selector-wrapper" id="projectSelectorWrap">
+          <button class="project-selector-btn" id="projectSelectorBtn" onclick="toggleProjectDropdown(event)" title="Click to switch project or add new project">
+            <div class="project-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                <line x1="12" y1="18" x2="12.01" y2="18"/>
+              </svg>
+            </div>
+            <div class="project-selector-info">
+              <span class="project-selector-label">PROJECT</span>
+              <span class="project-selector-name" id="activeProjectName">SINA User Android</span>
+            </div>
+            <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          <div class="project-dropdown hidden" id="projectDropdownMenu">
+            <div class="dropdown-header">MONITORED PROJECTS</div>
+            <div class="dropdown-list" id="projectListItems">
+              <!-- Populated dynamically -->
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-action-btn" onclick="openAddProjectModal()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>+ Add New Project</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Auto-Watch Toggle Button -->
+        <button class="btn btn-toggle active" id="autoWatchToggleBtn" onclick="toggleAutoWatch()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          <span id="autoWatchText">Auto-Watch: ON</span>
+        </button>
+
+        <!-- Provider Badge -->
+        <div class="topbar-badge" id="providerBadge">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+          </svg>
+          <span>GitHub Releases</span>
+        </div>
+
+        <!-- Interactive Server Connection & Reconnect Button -->
+        <button class="topbar-badge connection-badge" id="serverConnBtn" onclick="manualReconnect()" title="Click to test connection or force reconnect">
+          <span class="status-indicator dot-active" id="serverConnDot"></span>
+          <span id="serverConnText">Server Online</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="reconnect-icon" id="reconnectIcon">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+
+        <!-- Watcher State Badge -->
+        <div class="topbar-badge watcher-state" id="watcherBadge">
+          <span class="status-indicator dot-gray" id="watcherDot"></span>
+          <span id="watcherText">Monitoring PC APK</span>
+        </div>
+
+        <!-- Primary Top Action -->
+        <button class="btn btn-primary btn-hero-top" id="manualCheckBtn" onclick="triggerManualCheckAndUpload()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span>Check & Upload Now</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="crm-content-area">
+      <!-- Top Project Navigation Tabs -->
+      <div class="project-tab-bar" id="projectTabBar">
+        <div class="project-tabs-header">SELECT MONITORED PROJECT TAB</div>
+        <div class="project-tabs-list" id="projectTabsList">
+          <!-- Dynamically populated project tab buttons -->
+        </div>
+        <div class="project-tab-actions">
+          <button class="btn btn-sm btn-primary btn-check-updates" id="refreshUpdatesBtn" onclick="checkForNewApks(true)" title="Check for newly built APKs from your PC / GitHub">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="refreshIcon">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span id="refreshBtnText">Check for Updates</span>
+          </button>
+          <button class="btn btn-sm btn-dark-secondary btn-add-tab" onclick="openAddProjectModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>+ Add Project</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Notification Banner for Newly Detected APK -->
+      <div id="newBuildNotificationBanner" class="new-build-banner hidden">
+        <div class="banner-left">
+          <span class="banner-pulse"></span>
+          <div class="banner-text">
+            <strong id="bannerTitle">New APK Available!</strong>
+            <span id="bannerDetails">Build detected & ready to install.</span>
+          </div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-xs btn-primary" onclick="dismissBanner(true)">Apply & Scan QR</button>
+          <button class="btn-banner-close" onclick="dismissBanner(false)" title="Dismiss">&times;</button>
+        </div>
+      </div>
+
+      <!-- Two Column Overview Section -->
+      <div class="content-grid" id="activeRelease">
+        
+        <!-- Left: Live QR Code & Active Build Metadata -->
+        <section class="card active-release-card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                  <line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+              </div>
+              <div>
+                <h2>Live Scan & Install QR</h2>
+                <p class="card-subtitle">Scan with your mobile phone camera to install the latest APK</p>
+              </div>
+            </div>
+            <span class="live-pill" id="liveTag">ACTIVE RELEASE</span>
+          </div>
+
+          <!-- QR Code Display Box -->
+          <div class="qr-container">
+            <div id="qrcodeCanvas" class="qr-box"></div>
+            <div id="qrPlaceholder" class="qr-placeholder hidden">
+              <div class="spinner"></div>
+              <p>Waiting for first build detection...</p>
+            </div>
+          </div>
+
+          <!-- Direct Download URL Input -->
+          <div class="url-field-group">
+            <label>Direct Release Asset URL</label>
+            <div class="url-input-wrap">
+              <input type="text" id="downloadUrlInput" readonly value="https://github.com/mdyahhya/app-releases/releases/download/latest/app-release.apk">
+              <button class="btn btn-dark-secondary" id="copyUrlBtn" onclick="copyDownloadUrl()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                <span>Copy Link</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Metadata Spec Grid -->
+          <div class="spec-grid" id="latestMetaGrid">
+            <div class="spec-cell">
+              <span class="spec-label">Version</span>
+              <span class="spec-val" id="metaVersion">v1.0.0</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-label">Binary Size</span>
+              <span class="spec-val" id="metaSize">53.77 MB</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-label">APK Build Time (Modified)</span>
+              <span class="spec-val" id="metaBuildTime">--</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-label">Cloud Distribution</span>
+              <span class="spec-val" id="metaTime">--</span>
+            </div>
+            <div class="spec-cell full-width">
+              <span class="spec-label">SHA-256 Checksum</span>
+              <span class="spec-val code-font" id="metaSha">--</span>
+            </div>
+          </div>
+
+          <!-- Actions Bar -->
+          <div class="card-actions">
+            <button class="btn btn-secondary" onclick="triggerManualUpload()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              <span>Force Re-Upload</span>
+            </button>
+            <button class="btn btn-outline" onclick="testConnection()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              <span>Test Connection</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Right: Chronological Build History -->
+        <section class="card history-card" id="buildHistory">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 8v4l3 3"/>
+                  <circle cx="12" cy="12" r="9"/>
+                </svg>
+              </div>
+              <div>
+                <h2>Version History & Archives</h2>
+                <p class="card-subtitle">Chronological ledger of builds with exact timestamps</p>
+              </div>
+            </div>
+            <span class="count-badge" id="buildCountBadge">0 Builds</span>
+          </div>
+
+          <!-- Build Timeline List -->
+          <div class="timeline-container" id="historyTimeline">
+            <div class="empty-state">
+              <p>No builds in history yet. Click <strong>Check & Upload Now</strong> or build in Flutter to populate.</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Bottom: System Watcher Logs (Clean Enterprise Console) -->
+      <section class="card log-card" id="systemLogs">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-icon-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+            </div>
+            <div>
+              <h2>System Watcher & Activity Log</h2>
+              <p class="card-subtitle">Real-time background listener events and distribution records</p>
+            </div>
+          </div>
+          <span class="log-time" id="lastCheckTime">Last checked: Never</span>
+        </div>
+
+        <div class="log-stream" id="logStream">
+          <div class="log-line info">[System] Initializing CRM distribution listener...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden">Copied download URL to clipboard!</div>
+
+  <!-- Add New Project Modal Dialog -->
+  <div class="modal-overlay hidden" id="addProjectModal" onclick="handleModalOverlayClick(event)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+          </div>
+          <div>
+            <h3>Add New Project</h3>
+            <p>Connect an Android or Flutter project from your PC desktop or any folder</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeAddProjectModal()">&times;</button>
+      </div>
+
+      <form class="modal-body" id="addProjectForm" onsubmit="handleAddProjectSubmit(event)">
+        <div class="form-group">
+          <label>Project Name <span class="req">*</span></label>
+          <input type="text" id="projNameInput" class="form-control" placeholder="e.g. SINA User Android" required>
+        </div>
+
+        <div class="form-group">
+          <label>Project Root Folder Path <span class="req">*</span></label>
+          <div class="folder-picker-group">
+            <input type="text" id="projFolderInput" class="form-control" placeholder="C:\Users\DELL\Desktop\SINA App\SINA User Android" required>
+            <button type="button" class="btn btn-dark-secondary btn-browse" onclick="browseNativeFolder()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>📁 Browse PC Folder</span>
+            </button>
+          </div>
+          <small class="form-hint">Pick any folder from PC desktop or enter local directory path</small>
+        </div>
+
+        <div class="form-group">
+          <label>APK File Path (Optional / Auto-Detected)</label>
+          <input type="text" id="projApkInput" class="form-control" placeholder="Auto-detected if left blank (build/app/outputs/flutter-apk/app-release.apk)">
+          <small class="form-hint">Leave blank to auto-detect APK build output inside selected project folder</small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAddProjectModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveProjBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Add & Switch Project</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- QR Code Generator & App Controller -->
+  <script src="qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
