@@ -1,0 +1,8 @@
+backend/
+requirements.txt
+run.py
+start.bat
+config/
+data/
+.env*
+scratch/
