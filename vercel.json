@@ -2,9 +2,15 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "builds": [
-    { "src": "index.html", "use": "@vercel/static" }
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "style.css", "use": "@vercel/static" },
+    { "src": "app.js", "use": "@vercel/static" },
+    { "src": "qrcode.min.js", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/$1" }
+    { "src": "/style.css", "dest": "/style.css" },
+    { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/qrcode.min.js", "dest": "/qrcode.min.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
