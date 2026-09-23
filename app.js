@@ -2,6 +2,31 @@ let currentQrUrl = "";
 let qrcodeObj = null;
 let isServerConnected = false;
 let pollTimer = null;
+let cachedGitHubReleases = [];
+
+const isCloudHosted = !(
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1" ||
+  window.location.protocol === "file:"
+);
+
+const DEFAULT_PROJECTS = [
+  { id: "sina-admin-android-new", name: "SINA Admin Android New", github_release_tag: "sina-admin-android-new" },
+  { id: "sina-user-android-new", name: "SINA User Android New", github_release_tag: "sina-user-android-new" },
+  { id: "sina-admin-android", name: "SINA Admin Android", github_release_tag: "sina-admin-android" },
+  { id: "sina-user-android", name: "SINA User Android", github_release_tag: "sina-user-android" },
+  { id: "school-app", name: "School App", github_release_tag: "latest" }
+];
+
+function getProjectReleaseTag(projectId) {
+  const p = DEFAULT_PROJECTS.find(x => x.id === projectId);
+  return p?.github_release_tag || projectId || "latest";
+}
+
+function getProjectName(projectId) {
+  const p = DEFAULT_PROJECTS.find(x => x.id === projectId);
+  return p?.name || projectId;
+}
 
 // Reusable SVG Icons
 const SVG_ICONS = {
@@ -15,12 +40,14 @@ const SVG_ICONS = {
   pause: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
 };
 
-// Universal API fetcher that works seamlessly whether served via HTTP or opened directly as file://
+// Universal API fetcher that only queries local server when in local environment
 async function apiFetch(endpoint, options = {}) {
+  if (isCloudHosted) {
+    throw new Error("Local PC features run via http://localhost:8765");
+  }
   const candidates = [];
-  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+  if (window.location.protocol === "http:") {
     candidates.push(endpoint);
-    candidates.push(`${window.location.origin}${endpoint}`);
   }
   candidates.push(`http://127.0.0.1:8765${endpoint}`);
   candidates.push(`http://localhost:8765${endpoint}`);
@@ -29,13 +56,22 @@ async function apiFetch(endpoint, options = {}) {
   for (const url of candidates) {
     try {
       const res = await fetch(url, options);
-      if (res && (res.ok || res.status < 500)) return res;
+      if (res && res.ok) {
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+          return res;
+        }
+      }
     } catch (err) {
       lastErr = err;
     }
   }
-  throw lastErr || new Error("Failed to reach server");
+  throw lastErr || new Error("Failed to reach local server");
 }
+
+let lastSeenBuildSignatures = {};
+let latestDetectedApk = null;
+let activeProjectIdCached = "sina-admin-android-new";
 
 // Ensure startup runs regardless of when script loads
 if (document.readyState === "loading") {
@@ -45,10 +81,37 @@ if (document.readyState === "loading") {
 }
 
 function initApp() {
-  pollStatus();
-  if (pollTimer) clearInterval(pollTimer);
-  // Auto-connect and live poll every 1.5 seconds
-  pollTimer = setInterval(pollStatus, 1500);
+  if (isCloudHosted) {
+    // Cloud Mode (e.g. Vercel)
+    const savedProject = localStorage.getItem("active_project_id") || "sina-admin-android-new";
+    activeProjectIdCached = savedProject;
+
+    setServerConnectionState(true, "Cloud Online");
+    setWatcherBadge("active", "Live Cloud Distribution");
+
+    const cloudConfig = {
+      active_project_id: activeProjectIdCached,
+      project_name: getProjectName(activeProjectIdCached),
+      projects: DEFAULT_PROJECTS,
+      github_repo: "app-releases"
+    };
+    updateProjectsUI(cloudConfig);
+    applyCloudProjectFallback(activeProjectIdCached);
+
+    // Initial sync from GitHub
+    syncWithGitHubReleases(false);
+
+    // Live background polling on GitHub Releases for new APK commits
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => {
+      syncWithGitHubReleases(false);
+    }, 15000);
+  } else {
+    // Local PC Mode
+    pollStatus();
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollStatus, 1500);
+  }
 
   // Close dropdown when clicking outside
   document.addEventListener("click", function(e) {
@@ -59,9 +122,31 @@ function initApp() {
   });
 }
 
-let lastSeenBuildSignatures = {};
-let latestDetectedApk = null;
-let activeProjectIdCached = "sina-admin-android";
+function applyCloudProjectFallback(projectId) {
+  const tag = getProjectReleaseTag(projectId);
+  const projName = getProjectName(projectId);
+  const downloadUrl = `https://github.com/mdyahhya/app-releases/releases/download/${tag}/app-release.apk`;
+
+  const fallbackApk = {
+    id: tag,
+    project_id: projectId,
+    project_name: projName,
+    filename: "app-release.apk",
+    version: tag,
+    version_label: `${projName} (${tag})`,
+    file_size_mb: "53.8",
+    download_url: downloadUrl,
+    provider: "github",
+    build_time: "Latest GitHub Release",
+    uploaded_at_formatted: "Available via GitHub Releases",
+    sha256: ""
+  };
+  updateLatestApk(fallbackApk, {
+    active_project_id: projectId,
+    project_name: projName,
+    download_url: downloadUrl
+  });
+}
 
 // Web Audio synthesizer for pleasant notification chime
 function playChime() {
@@ -133,6 +218,7 @@ function dismissBanner(apply = false) {
 }
 
 async function pollStatus() {
+  if (isCloudHosted) return;
   try {
     const res = await apiFetch("/api/status");
     if (!res.ok) {
@@ -155,7 +241,6 @@ async function pollStatus() {
   } catch (err) {
     setServerConnectionState(false);
     setWatcherBadge("offline", "Server Offline (Using Cloud Sync)");
-    // Fallback: fetch directly from GitHub Releases for standalone live hosting
     await syncWithGitHubReleases(false);
   }
 }
@@ -164,9 +249,38 @@ async function pollStatus() {
 async function syncWithGitHubReleases(isManual = false) {
   try {
     const res = await fetch("https://api.github.com/repos/mdyahhya/app-releases/releases");
-    if (!res.ok) return;
+    if (!res.ok) {
+      applyCloudProjectFallback(activeProjectIdCached);
+      return;
+    }
     const releases = await res.json();
-    if (!Array.isArray(releases) || releases.length === 0) return;
+    if (!Array.isArray(releases) || releases.length === 0) {
+      applyCloudProjectFallback(activeProjectIdCached);
+      return;
+    }
+
+    cachedGitHubReleases = releases;
+
+    // Render build history from releases
+    const historyList = releases.map(r => {
+      const asset = (r.assets && r.assets.length > 0) ? r.assets[0] : null;
+      const sizeMb = asset ? (asset.size / (1024 * 1024)).toFixed(2) : "53.8";
+      const dt = new Date(r.published_at || Date.now()).toLocaleDateString([], {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+      return {
+        id: r.id,
+        version: r.tag_name,
+        version_label: r.name || r.tag_name,
+        file_size_mb: sizeMb,
+        download_url: asset ? asset.browser_download_url : `https://github.com/mdyahhya/app-releases/releases/download/${r.tag_name}/app-release.apk`,
+        build_time: dt,
+        uploaded_at: r.published_at,
+        uploaded_at_formatted: dt,
+        sha256: ""
+      };
+    });
+    renderHistory(historyList);
 
     // Map releases by tag
     const releaseMap = {};
@@ -174,40 +288,46 @@ async function syncWithGitHubReleases(isManual = false) {
       if (r.tag_name) releaseMap[r.tag_name] = r;
     });
 
-    const activeTag = activeProjectIdCached || "sina-admin-android";
+    const activeTag = getProjectReleaseTag(activeProjectIdCached);
     const matchedRelease = releaseMap[activeTag] || releaseMap["latest"] || releases[0];
 
-    if (!matchedRelease) return;
+    if (matchedRelease) {
+      const asset = (matchedRelease.assets && matchedRelease.assets.length > 0) ? matchedRelease.assets[0] : null;
+      const downloadUrl = asset ? asset.browser_download_url : `https://github.com/mdyahhya/app-releases/releases/download/${matchedRelease.tag_name}/app-release.apk`;
+      const sizeMb = asset ? (asset.size / (1024 * 1024)).toFixed(2) : "53.8";
+      const dateFormatted = new Date(matchedRelease.published_at || Date.now()).toLocaleDateString([], {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
 
-    const asset = (matchedRelease.assets && matchedRelease.assets.length > 0) ? matchedRelease.assets[0] : null;
-    const downloadUrl = asset ? asset.browser_download_url : `https://github.com/mdyahhya/app-releases/releases/download/${matchedRelease.tag_name}/app-release.apk`;
-    const sizeMb = asset ? (asset.size / (1024 * 1024)).toFixed(2) : "22.5";
-    const dateFormatted = new Date(matchedRelease.published_at || Date.now()).toLocaleDateString([], {
-      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
-    });
+      const cloudApk = {
+        id: matchedRelease.id,
+        project_id: activeProjectIdCached,
+        project_name: getProjectName(activeProjectIdCached),
+        filename: asset ? asset.name : "app-release.apk",
+        version: matchedRelease.tag_name,
+        version_label: matchedRelease.name || matchedRelease.tag_name,
+        file_size_mb: sizeMb,
+        download_url: downloadUrl,
+        provider: "github",
+        build_time: dateFormatted,
+        uploaded_at: matchedRelease.published_at,
+        uploaded_at_formatted: dateFormatted,
+        is_latest: true
+      };
 
-    const cloudApk = {
-      id: matchedRelease.id,
-      project_id: activeTag,
-      project_name: matchedRelease.name || activeTag,
-      filename: asset ? asset.name : "app-release.apk",
-      version: matchedRelease.tag_name,
-      version_label: matchedRelease.name || matchedRelease.tag_name,
-      file_size_mb: sizeMb,
-      download_url: downloadUrl,
-      provider: "github",
-      build_time: dateFormatted,
-      uploaded_at: matchedRelease.published_at,
-      uploaded_at_formatted: dateFormatted,
-      is_latest: true
-    };
+      updateLatestApk(cloudApk, {
+        active_project_id: activeProjectIdCached,
+        project_name: getProjectName(activeProjectIdCached),
+        download_url: downloadUrl
+      });
+    }
 
-    updateLatestApk(cloudApk);
     if (isManual) {
-      showToast("Cloud sync complete: Live release fetched from GitHub!");
+      showToast("Checked: Live GitHub Releases are up-to-date!");
     }
   } catch (e) {
     console.warn("GitHub Releases cloud sync error:", e);
+    applyCloudProjectFallback(activeProjectIdCached);
   }
 }
 
@@ -220,30 +340,34 @@ async function checkForNewApks(manual = false) {
     if (icon) icon.classList.add("spin");
     if (btnText) btnText.textContent = "Checking...";
     if (btn) btn.disabled = true;
-    showToast("Scanning for new APK builds from PC & Cloud...");
+    showToast("Scanning for new APK builds from GitHub & PC...");
   }
 
   try {
-    let connected = false;
-    try {
-      const res = await apiFetch("/api/status");
-      if (res && res.ok) {
-        const data = await res.json();
-        setServerConnectionState(true, data.watcher?.status);
-        updateBadges(data);
-        updateProjectsUI(data.config);
-        updateLatestApk(data.current_apk, data.config);
-        renderHistory(data.history || []);
-        renderLogs(data.watcher?.logs || []);
-        connected = true;
-        if (manual) showToast("Checked: Live local PC & GitHub sync up-to-date!");
-      }
-    } catch (e) {
-      // Offline fallback
-    }
-
-    if (!connected) {
+    if (isCloudHosted) {
       await syncWithGitHubReleases(manual);
+    } else {
+      let connected = false;
+      try {
+        const res = await apiFetch("/api/status");
+        if (res && res.ok) {
+          const data = await res.json();
+          setServerConnectionState(true, data.watcher?.status);
+          updateBadges(data);
+          updateProjectsUI(data.config);
+          updateLatestApk(data.current_apk, data.config);
+          renderHistory(data.history || []);
+          renderLogs(data.watcher?.logs || []);
+          connected = true;
+          if (manual) showToast("Checked: Live local PC & GitHub sync up-to-date!");
+        }
+      } catch (e) {
+        // Offline fallback
+      }
+
+      if (!connected) {
+        await syncWithGitHubReleases(manual);
+      }
     }
   } catch (err) {
     if (manual) showToast("Error checking updates: " + err.message);
@@ -345,6 +469,49 @@ async function switchProject(projectId) {
   closeProjectDropdown();
   // Force reset QR cache so the newly selected tab always regenerates its QR code
   currentQrUrl = "";
+  activeProjectIdCached = projectId;
+  localStorage.setItem("active_project_id", projectId);
+
+  if (isCloudHosted) {
+    const projName = getProjectName(projectId);
+    showToast(`Switched project tab: ${projName}`);
+    const cloudConfig = {
+      active_project_id: projectId,
+      project_name: projName,
+      projects: DEFAULT_PROJECTS,
+      github_repo: "app-releases"
+    };
+    updateProjectsUI(cloudConfig);
+    applyCloudProjectFallback(projectId);
+
+    // If cached GitHub releases are available, enrich details
+    if (cachedGitHubReleases && cachedGitHubReleases.length > 0) {
+      const activeTag = getProjectReleaseTag(projectId);
+      const matched = cachedGitHubReleases.find(r => r.tag_name === activeTag);
+      if (matched) {
+        const asset = (matched.assets && matched.assets.length > 0) ? matched.assets[0] : null;
+        const downloadUrl = asset ? asset.browser_download_url : `https://github.com/mdyahhya/app-releases/releases/download/${matched.tag_name}/app-release.apk`;
+        const sizeMb = asset ? (asset.size / (1024 * 1024)).toFixed(2) : "53.8";
+        const dateFormatted = new Date(matched.published_at || Date.now()).toLocaleDateString([], {
+          day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+        });
+        updateLatestApk({
+          id: matched.id,
+          project_id: projectId,
+          project_name: projName,
+          filename: asset ? asset.name : "app-release.apk",
+          version: matched.tag_name,
+          version_label: matched.name || matched.tag_name,
+          file_size_mb: sizeMb,
+          download_url: downloadUrl,
+          provider: "github",
+          build_time: dateFormatted,
+          uploaded_at_formatted: dateFormatted
+        }, cloudConfig);
+      }
+    }
+    return;
+  }
   
   showToast("Switching project tab...");
   try {
@@ -386,6 +553,11 @@ function handleModalOverlayClick(e) {
 }
 
 async function browseNativeFolder() {
+  if (isCloudHosted) {
+    showToast("📁 Folder browsing connects to your local PC. Run 'python run.py' and open http://localhost:8765 to monitor local folders.");
+    return;
+  }
+
   showToast("Opening Windows File Explorer folder picker...");
   try {
     const res = await apiFetch("/api/browse-folder", { method: "POST" });
@@ -423,6 +595,12 @@ async function handleAddProjectSubmit(event) {
 
   if (!name || !folder) {
     showToast("Project Name and Folder Path are required!");
+    return;
+  }
+
+  if (isCloudHosted) {
+    showToast("ℹ️ To monitor new local build folders, configure them in your local app at http://localhost:8765");
+    closeAddProjectModal();
     return;
   }
 
@@ -465,6 +643,17 @@ function setServerConnectionState(isOnline, statusText = "") {
 
   if (!connBtn) return;
 
+  if (isCloudHosted) {
+    connBtn.classList.remove("offline");
+    if (connDot) {
+      connDot.className = "status-indicator dot-active";
+    }
+    if (connText) {
+      connText.textContent = "Cloud Live (GitHub)";
+    }
+    return;
+  }
+
   if (isOnline) {
     connBtn.classList.remove("offline");
     if (connDot) {
@@ -485,6 +674,12 @@ function setServerConnectionState(isOnline, statusText = "") {
 }
 
 async function manualReconnect() {
+  if (isCloudHosted) {
+    showToast("Checking GitHub Releases for live build updates...");
+    await checkForNewApks(true);
+    return;
+  }
+
   const icon = document.getElementById("reconnectIcon");
   if (icon) icon.classList.add("spin");
 
@@ -722,6 +917,10 @@ function renderLogs(logs) {
 }
 
 async function toggleAutoWatch() {
+  if (isCloudHosted) {
+    showToast("ℹ️ Auto-Watch file monitoring runs on your PC (http://localhost:8765). The live site receives builds via GitHub Releases.");
+    return;
+  }
   try {
     const res = await apiFetch("/api/watcher/toggle", { method: "POST" });
     const data = await res.json();
@@ -733,6 +932,12 @@ async function toggleAutoWatch() {
 }
 
 async function triggerManualCheckAndUpload() {
+  if (isCloudHosted) {
+    showToast("Scanning GitHub Releases for latest APK builds...");
+    await checkForNewApks(true);
+    return;
+  }
+
   const btn = document.getElementById("manualCheckBtn");
   const originalHtml = btn ? btn.innerHTML : "";
   
