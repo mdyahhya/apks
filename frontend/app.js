@@ -125,16 +125,17 @@ function initApp() {
 function applyCloudProjectFallback(projectId) {
   const tag = getProjectReleaseTag(projectId);
   const projName = getProjectName(projectId);
-  const downloadUrl = `https://github.com/mdyahhya/app-releases/releases/download/${tag}/app-release.apk`;
+  const apkName = (projectId.includes("new") || projectId.includes("sina")) ? "app-arm64-v8a-release.apk" : "app-release.apk";
+  const downloadUrl = `https://github.com/mdyahhya/app-releases/releases/download/${tag}/${apkName}`;
 
   const fallbackApk = {
     id: tag,
     project_id: projectId,
     project_name: projName,
-    filename: "app-release.apk",
+    filename: apkName,
     version: tag,
     version_label: `${projName} (${tag})`,
-    file_size_mb: "53.8",
+    file_size_mb: "17.6",
     download_url: downloadUrl,
     provider: "github",
     build_time: "Latest GitHub Release",
@@ -147,6 +148,7 @@ function applyCloudProjectFallback(projectId) {
     download_url: downloadUrl
   });
 }
+
 
 // Web Audio synthesizer for pleasant notification chime
 function playChime() {

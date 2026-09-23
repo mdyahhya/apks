@@ -71,8 +71,16 @@ class APKWatcher:
             if "/releases/download/latest/" in h_url:
                 h["download_url"] = h_url.replace("/releases/download/latest/", f"/releases/download/{target_tag}/")
 
-        # If no current_apk record exists yet, auto-inspect local file on disk if present
+        # Auto-detect newest local file on disk if configured target_path does not exist
         target_path = Path(config.apk_file_path)
+        if not target_path.exists():
+            from backend.config import auto_detect_apk_path
+            auto_path = auto_detect_apk_path(config.flutter_project_root)
+            if auto_path and Path(auto_path).exists():
+                config.apk_file_path = auto_path
+                config.apk_filename = Path(auto_path).name
+                target_path = Path(auto_path)
+
         if not self.state["current_apk"] and target_path.exists():
             try:
                 meta = get_apk_metadata(target_path, config.flutter_project_root)
@@ -103,6 +111,7 @@ class APKWatcher:
                     self.last_seen_mtime = meta.get("mtime_timestamp")
             except Exception as e:
                 logger.warning(f"Could not auto-inspect local APK for {config.project_name}: {e}")
+
 
         self._log(f"Switched context to project '{config.project_name}' (Tag: {target_tag} | Target APK: {config.apk_file_path})")
 
@@ -232,8 +241,16 @@ class APKWatcher:
         self.state["last_check_time"] = datetime.now().strftime("%H:%M:%S")
 
         if not target_path.exists():
-            self.state["status"] = "waiting_for_file"
-            return
+            from backend.config import auto_detect_apk_path
+            auto_path = auto_detect_apk_path(config.flutter_project_root)
+            if auto_path and Path(auto_path).exists():
+                config.apk_file_path = auto_path
+                config.apk_filename = Path(auto_path).name
+                target_path = Path(auto_path)
+            else:
+                self.state["status"] = "waiting_for_file"
+                return
+
 
         # 1. Check if Windows file lock active (Flutter compiler compiling)
         if is_file_locked(target_path):
@@ -292,9 +309,17 @@ class APKWatcher:
         self._log(f"Manual 'Check & Upload Now' triggered for project '{config.project_name}'", level="INFO")
 
         if not target_path.exists():
-            msg = f"APK file not found at path: {target_path}"
-            self._log(msg, level="ERROR")
-            return {"success": False, "error": msg}
+            from backend.config import auto_detect_apk_path
+            auto_path = auto_detect_apk_path(config.flutter_project_root)
+            if auto_path and Path(auto_path).exists():
+                config.apk_file_path = auto_path
+                config.apk_filename = Path(auto_path).name
+                target_path = Path(auto_path)
+            else:
+                msg = f"APK file not found at path: {target_path}"
+                self._log(msg, level="ERROR")
+                return {"success": False, "error": msg}
+
 
         if is_file_locked(target_path):
             msg = "Flutter is still compiling/writing the APK. Please wait a moment and try again."

@@ -1,42 +1,45 @@
 {
-  "active_project_id": "sina-user-android-new",
+  "active_project_id": "sina-admin-android-new",
   "projects": [
+    {
+      "id": "sina-admin-android-new",
+      "name": "SINA Admin Android New",
+      "flutter_project_root": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android New",
+      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android New\\build\\app\\outputs\\flutter-apk\\app-arm64-v8a-release.apk",
+      "apk_filename": "app-arm64-v8a-release.apk",
+      "github_release_tag": "sina-admin-android-new"
+    },
+    {
+      "id": "sina-user-android-new",
+      "name": "SINA User Android New",
+      "flutter_project_root": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android New",
+      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android New\\build\\app\\outputs\\flutter-apk\\app-arm64-v8a-release.apk",
+      "apk_filename": "app-arm64-v8a-release.apk",
+      "github_release_tag": "sina-user-android-new"
+    },
     {
       "id": "sina-user-android",
       "name": "SINA User Android",
       "flutter_project_root": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android",
-      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android\\build\\app\\outputs\\flutter-apk\\app-release.apk",
-      "apk_filename": "app-release.apk"
+      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android\\build\\app\\outputs\\flutter-apk\\app-arm64-v8a-release.apk",
+      "apk_filename": "app-arm64-v8a-release.apk",
+      "github_release_tag": "sina-user-android"
     },
     {
       "id": "sina-admin-android",
       "name": "SINA Admin Android",
       "flutter_project_root": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android",
-      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android\\build\\app\\outputs\\flutter-apk\\app-release.apk",
-      "apk_filename": "app-release.apk"
+      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android\\build\\app\\outputs\\flutter-apk\\app-arm64-v8a-release.apk",
+      "apk_filename": "app-arm64-v8a-release.apk",
+      "github_release_tag": "sina-admin-android"
     },
     {
       "id": "school-app",
       "name": "School App",
       "flutter_project_root": "C:\\Users\\DELL\\Desktop\\school_app",
       "apk_path": "C:\\Users\\DELL\\Desktop\\school_app\\build\\app\\outputs\\flutter-apk\\app-release.apk",
-      "apk_filename": "app-release.apk"
-    },
-    {
-      "id": "sina-admin-android-new",
-      "name": "SINA Admin Android New",
-      "flutter_project_root": "C:/Users/DELL/Desktop/SINA App/SINA Admin Android New",
-      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA Admin Android New\\build\\app\\outputs\\flutter-apk\\app-release.apk",
       "apk_filename": "app-release.apk",
-      "github_release_tag": "sina-admin-android-new"
-    },
-    {
-      "id": "sina-user-android-new",
-      "name": "SINA User Android New",
-      "flutter_project_root": "C:/Users/DELL/Desktop/SINA App/SINA User Android New",
-      "apk_path": "C:\\Users\\DELL\\Desktop\\SINA App\\SINA User Android New\\build\\app\\outputs\\flutter-apk\\app-release.apk",
-      "apk_filename": "app-release.apk",
-      "github_release_tag": "sina-user-android-new"
+      "github_release_tag": "school-app"
     }
   ]
 }

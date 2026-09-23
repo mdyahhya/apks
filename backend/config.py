@@ -14,22 +14,47 @@ PROJECTS_JSON_PATH = BASE_DIR / "config" / "projects.json"
 
 
 def auto_detect_apk_path(root_path: str) -> str:
-    """Helper to auto-detect standard Flutter / Android output APK paths."""
+    """Intelligently detects built APK path within Flutter/Android project, picking newest .apk."""
     if not root_path:
         return ""
     root = Path(root_path)
+
+    # Search common Flutter & Android build output folders
+    search_dirs = [
+        root / "build" / "app" / "outputs" / "flutter-apk",
+        root / "build" / "app" / "outputs" / "apk" / "release",
+        root / "app" / "build" / "outputs" / "apk" / "release",
+        root / "build" / "app" / "outputs" / "apk" / "debug",
+    ]
+
+    found_apks = []
+    for d in search_dirs:
+        if d.exists() and d.is_dir():
+            for f in d.glob("*.apk"):
+                if f.is_file() and not f.name.endswith(".sha1"):
+                    try:
+                        found_apks.append((f.stat().st_mtime, f))
+                    except Exception:
+                        pass
+
+    if found_apks:
+        # Sort by latest modification time (newest first)
+        found_apks.sort(key=lambda x: x[0], reverse=True)
+        return str(found_apks[0][1])
+
+    # Direct fallback candidates
     candidates = [
+        root / "build" / "app" / "outputs" / "flutter-apk" / "app-arm64-v8a-release.apk",
         root / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk",
-        root / "build" / "app" / "outputs" / "apk" / "release" / "app-release.apk",
-        root / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk",
-        root / "build" / "app" / "outputs" / "flutter-apk" / "app-debug.apk",
-        root / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+        root / "build" / "app" / "outputs" / "apk" / "release" / "app-arm64-v8a-release.apk",
+        root / "build" / "app" / "outputs" / "apk" / "release" / "app-release.apk"
     ]
     for candidate in candidates:
         if candidate.exists():
             return str(candidate)
-    # Default standard Flutter release path
-    return str(root / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk")
+
+    return str(root / "build" / "app" / "outputs" / "flutter-apk" / "app-arm64-v8a-release.apk")
+
 
 
 class Config:
@@ -148,8 +173,12 @@ class Config:
         if active:
             self.project_name = active.get("name", self.project_name)
             self.flutter_project_root = active.get("flutter_project_root", self.flutter_project_root)
-            self.apk_file_path = active.get("apk_path", auto_detect_apk_path(self.flutter_project_root))
-            self.apk_filename = active.get("apk_filename", "app-release.apk")
+            specified_path = active.get("apk_path")
+            if specified_path and Path(specified_path).exists():
+                self.apk_file_path = specified_path
+            else:
+                self.apk_file_path = auto_detect_apk_path(self.flutter_project_root)
+            self.apk_filename = Path(self.apk_file_path).name if self.apk_file_path else active.get("apk_filename", "app-arm64-v8a-release.apk")
 
     def get_active_project(self) -> dict:
         """Returns the active project dictionary."""
@@ -242,12 +271,11 @@ class Config:
         filename = filename or self.apk_filename
         release_tag = tag or self.get_project_release_tag()
         if self.distribution_provider == "github":
-            if self.github_public_download_url:
-                return self.github_public_download_url
             return f"https://github.com/{self.github_username}/{self.github_repo}/releases/download/{release_tag}/{filename}"
         else:
             domain = self.r2_public_domain.rstrip('/')
             return f"{domain}/{filename}"
+
 
     def to_safe_dict(self) -> dict:
         """Returns safe configuration dictionary isolating all sensitive tokens."""
