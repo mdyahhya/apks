@@ -1,0 +1,12 @@
+{
+  "project_name": "School App",
+  "apk_path": "C:\\Users\\DELL\\Desktop\\school_app\\build\\app\\outputs\\flutter-apk\\app-release.apk",
+  "apk_filename": "app-release.apk",
+  "flutter_project_root": "C:\\Users\\DELL\\Desktop\\school_app",
+  "r2_bucket": "flutter-apk-releases",
+  "r2_object_key": "latest/app-release.apk",
+  "r2_public_base_url": "https://pub-sample.r2.dev",
+  "poll_interval_seconds": 2,
+  "stability_check_seconds": 3,
+  "local_port": 8765
+}

@@ -1,0 +1,22 @@
+# Python environment & cache
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env.local
+
+# Secrets & Private Environment Variables (CRITICAL)
+.env
+secrets.json
+
+# Local runtime data
+data/state*.json
+data/history*.json
+
+# Logs & temp files
+*.log
+scratch/
+.idea/
+.vscode/
