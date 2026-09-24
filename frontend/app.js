@@ -4,6 +4,20 @@ let isServerConnected = false;
 let pollTimer = null;
 let cachedGitHubReleases = [];
 
+// Track initial load window (suppress chime sounds & flash animations for first 5s after startup)
+let isInitialLoadWindow = true;
+setTimeout(() => {
+  isInitialLoadWindow = false;
+}, 5000);
+
+// Signatures to prevent DOM re-renders and UI flickering
+let lastRenderedHistorySignature = "";
+let lastRenderedLogsSignature = "";
+let lastRenderedTabsSignature = "";
+let lastRenderedDropdownSignature = "";
+let lastWatcherBadgeState = "";
+let lastProviderBadgeState = "";
+
 const isCloudHosted = !(
   window.location.hostname === "localhost" ||
   window.location.hostname === "127.0.0.1" ||
@@ -32,7 +46,7 @@ function getProjectName(projectId) {
 const SVG_ICONS = {
   download: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   copy: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
-  clock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  clock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 16 14"/></svg>`,
   cloud: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>`,
   file: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`,
   hash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>`,
@@ -140,7 +154,7 @@ function applyCloudProjectFallback(projectId) {
     provider: "github",
     build_time: "Latest GitHub Release",
     uploaded_at_formatted: "Available via GitHub Releases",
-    sha256: ""
+    sha256: "fallback_sig"
   };
   updateLatestApk(fallbackApk, {
     active_project_id: projectId,
@@ -148,7 +162,6 @@ function applyCloudProjectFallback(projectId) {
     download_url: downloadUrl
   });
 }
-
 
 // Web Audio synthesizer for pleasant notification chime
 function playChime() {
@@ -225,7 +238,6 @@ async function pollStatus() {
     const res = await apiFetch("/api/status");
     if (!res.ok) {
       setServerConnectionState(false);
-      await syncWithGitHubReleases(false);
       return;
     }
     const data = await res.json();
@@ -242,8 +254,7 @@ async function pollStatus() {
 
   } catch (err) {
     setServerConnectionState(false);
-    setWatcherBadge("offline", "Server Offline (Using Cloud Sync)");
-    await syncWithGitHubReleases(false);
+    setWatcherBadge("offline", "Server Offline");
   }
 }
 
@@ -390,12 +401,18 @@ function updateProjectsUI(configData) {
   const sidebarNameEl = document.getElementById("sidebarProjectName");
   const sidebarPathEl = document.getElementById("sidebarProjectPath");
 
-  if (activeNameEl) activeNameEl.textContent = configData.project_name || "SINA User Android";
-  if (sidebarNameEl) sidebarNameEl.textContent = configData.project_name || "SINA User Android";
+  if (activeNameEl && activeNameEl.textContent !== (configData.project_name || "SINA User Android")) {
+    activeNameEl.textContent = configData.project_name || "SINA User Android";
+  }
+  if (sidebarNameEl && sidebarNameEl.textContent !== (configData.project_name || "SINA User Android")) {
+    sidebarNameEl.textContent = configData.project_name || "SINA User Android";
+  }
   if (sidebarPathEl) {
     const relPath = configData.apk_file_path || "build/app/outputs/flutter-apk/app-release.apk";
-    sidebarPathEl.textContent = relPath;
-    sidebarPathEl.title = relPath;
+    if (sidebarPathEl.textContent !== relPath) {
+      sidebarPathEl.textContent = relPath;
+      sidebarPathEl.title = relPath;
+    }
   }
 
   renderProjectDropdownItems(configData.projects || [], configData.active_project_id);
@@ -405,6 +422,12 @@ function updateProjectsUI(configData) {
 function renderProjectTabs(projects, activeId) {
   const container = document.getElementById("projectTabsList");
   if (!container) return;
+
+  const currentSig = `${activeId}_${projects.map(p => p.id).join(",")}`;
+  if (lastRenderedTabsSignature === currentSig && container.children.length > 0) {
+    return;
+  }
+  lastRenderedTabsSignature = currentSig;
 
   if (projects.length === 0) {
     container.innerHTML = `<div class="project-tab disabled">No projects</div>`;
@@ -429,6 +452,12 @@ function renderProjectTabs(projects, activeId) {
 function renderProjectDropdownItems(projects, activeId) {
   const container = document.getElementById("projectListItems");
   if (!container) return;
+
+  const currentSig = `${activeId}_${projects.map(p => p.id).join(",")}`;
+  if (lastRenderedDropdownSignature === currentSig && container.children.length > 0) {
+    return;
+  }
+  lastRenderedDropdownSignature = currentSig;
 
   if (projects.length === 0) {
     container.innerHTML = `<div class="dropdown-item disabled">No projects configured</div>`;
@@ -469,8 +498,12 @@ function closeProjectDropdown() {
 
 async function switchProject(projectId) {
   closeProjectDropdown();
-  // Force reset QR cache so the newly selected tab always regenerates its QR code
+  // Force reset QR & tab cache so the newly selected tab renders cleanly
   currentQrUrl = "";
+  lastRenderedHistorySignature = "";
+  lastRenderedLogsSignature = "";
+  lastRenderedTabsSignature = "";
+  lastRenderedDropdownSignature = "";
   activeProjectIdCached = projectId;
   localStorage.setItem("active_project_id", projectId);
 
@@ -661,7 +694,7 @@ function setServerConnectionState(isOnline, statusText = "") {
     if (connDot) {
       connDot.className = "status-indicator dot-active";
     }
-    if (connText) {
+    if (connText && connText.textContent !== "Server Online") {
       connText.textContent = "Server Online";
     }
   } else {
@@ -669,7 +702,7 @@ function setServerConnectionState(isOnline, statusText = "") {
     if (connDot) {
       connDot.className = "status-indicator dot-offline";
     }
-    if (connText) {
+    if (connText && connText.textContent !== "Offline (Click to Connect)") {
       connText.textContent = "Offline (Click to Connect)";
     }
   }
@@ -710,50 +743,70 @@ async function manualReconnect() {
 function updateBadges(data) {
   const providerBadge = document.getElementById("providerBadge");
   if (providerBadge && data.config) {
-    providerBadge.innerHTML = `
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-      </svg>
-      <span>GitHub Releases (${data.config.github_repo || 'app-releases'})</span>
-    `;
+    const pState = data.config.github_repo || 'app-releases';
+    if (lastProviderBadgeState !== pState) {
+      lastProviderBadgeState = pState;
+      providerBadge.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+        </svg>
+        <span>GitHub Releases (${pState})</span>
+      `;
+    }
   }
 
   const isAuto = data.watcher?.auto_watch_enabled !== false;
   const toggleBtn = document.getElementById("autoWatchToggleBtn");
   if (toggleBtn) {
-    if (isAuto) {
-      toggleBtn.className = "btn btn-toggle active";
-      toggleBtn.innerHTML = `${SVG_ICONS.bolt} <span id="autoWatchText">Auto-Watch: ON</span>`;
-    } else {
-      toggleBtn.className = "btn btn-toggle disabled";
-      toggleBtn.innerHTML = `${SVG_ICONS.pause} <span id="autoWatchText">Manual Mode (OFF)</span>`;
+    const wantedClass = isAuto ? "btn btn-toggle active" : "btn btn-toggle disabled";
+    if (toggleBtn.className !== wantedClass) {
+      if (isAuto) {
+        toggleBtn.className = "btn btn-toggle active";
+        toggleBtn.innerHTML = `${SVG_ICONS.bolt} <span id="autoWatchText">Auto-Watch: ON</span>`;
+      } else {
+        toggleBtn.className = "btn btn-toggle disabled";
+        toggleBtn.innerHTML = `${SVG_ICONS.pause} <span id="autoWatchText">Manual Mode (OFF)</span>`;
+      }
     }
   }
 
   const watcherStatus = data.watcher?.status || "idle";
   const uploadStatus = data.watcher?.upload_status || "none";
 
+  let badgeState = "gray";
+  let badgeText = watcherStatus;
+
   if (uploadStatus === "uploading") {
-    setWatcherBadge("amber", "Uploading to GitHub...");
+    badgeState = "amber";
+    badgeText = "Uploading to GitHub...";
   } else if (watcherStatus === "building") {
-    setWatcherBadge("amber", "Flutter Compiling APK...");
+    badgeState = "amber";
+    badgeText = "Flutter Compiling APK...";
   } else if (watcherStatus === "manual_mode") {
-    setWatcherBadge("gray", "Manual Mode Ready");
+    badgeState = "gray";
+    badgeText = "Manual Mode Ready";
   } else if (watcherStatus === "monitoring" || watcherStatus === "waiting_for_file") {
-    setWatcherBadge("active", isAuto ? "Monitoring PC APK" : "Manual Mode Ready");
-  } else {
-    setWatcherBadge("gray", watcherStatus);
+    badgeState = "active";
+    badgeText = isAuto ? "Monitoring PC APK" : "Manual Mode Ready";
   }
+
+  setWatcherBadge(badgeState, badgeText);
 
   if (data.watcher?.last_check_time) {
     const timeEl = document.getElementById("lastCheckTime");
-    if (timeEl) timeEl.textContent = `Last checked: ${data.watcher.last_check_time}`;
+    if (timeEl && timeEl.textContent !== `Last checked: ${data.watcher.last_check_time}`) {
+      timeEl.textContent = `Last checked: ${data.watcher.last_check_time}`;
+    }
   }
 }
 
 function setWatcherBadge(state, text) {
   const badge = document.getElementById("watcherBadge");
   if (!badge) return;
+
+  const wState = `${state}_${text}`;
+  if (lastWatcherBadgeState === wState) return;
+  lastWatcherBadgeState = wState;
 
   let dotClass = "dot-gray";
   if (state === "active") dotClass = "dot-active";
@@ -773,15 +826,21 @@ function updateLatestApk(currentApk, config) {
 
   const container = document.getElementById("qrcodeCanvas");
   if (targetUrl && (currentQrUrl !== targetUrl || (container && !container.firstElementChild))) {
-    currentQrUrl = targetUrl;
     renderQrCode(targetUrl);
   }
 
   if (currentApk) {
     const projId = currentApk.project_id || config?.active_project_id || activeProjectIdCached || "default";
-    const signature = `${currentApk.id || ''}_${currentApk.sha256 || ''}_${currentApk.mtime_timestamp || currentApk.uploaded_at || ''}`;
+    const sigParts = [
+      currentApk.id || '',
+      currentApk.sha256 || '',
+      currentApk.download_url || '',
+      currentApk.mtime_timestamp || currentApk.uploaded_at || currentApk.build_time || ''
+    ].filter(Boolean);
+    const signature = sigParts.join("_");
 
-    if (lastSeenBuildSignatures[projId] && lastSeenBuildSignatures[projId] !== signature) {
+    const oldSig = lastSeenBuildSignatures[projId];
+    if (!isInitialLoadWindow && oldSig && oldSig !== signature && !oldSig.includes("fallback_sig")) {
       triggerNewBuildNotification(currentApk);
     }
     lastSeenBuildSignatures[projId] = signature;
@@ -792,13 +851,17 @@ function updateLatestApk(currentApk, config) {
     const timeEl = document.getElementById("metaTime");
     const shaEl = document.getElementById("metaSha");
 
-    if (verEl) verEl.textContent = currentApk.version_label || `v${currentApk.version}`;
-    if (sizeEl) sizeEl.textContent = `${currentApk.file_size_mb} MB`;
-    if (buildTimeEl) {
-      buildTimeEl.textContent = currentApk.build_time || currentApk.file_modified_at || currentApk.uploaded_at_formatted || "Recently";
-    }
-    if (timeEl) timeEl.textContent = currentApk.uploaded_at_formatted || "Recently";
-    if (shaEl) shaEl.textContent = currentApk.sha256 ? currentApk.sha256.substring(0, 20) + "..." : "--";
+    const newVer = currentApk.version_label || `v${currentApk.version}`;
+    const newSize = `${currentApk.file_size_mb} MB`;
+    const newBuildTime = currentApk.build_time || currentApk.file_modified_at || currentApk.uploaded_at_formatted || "Recently";
+    const newTime = currentApk.uploaded_at_formatted || "Recently";
+    const newSha = currentApk.sha256 ? currentApk.sha256.substring(0, 20) + "..." : "--";
+
+    if (verEl && verEl.textContent !== newVer) verEl.textContent = newVer;
+    if (sizeEl && sizeEl.textContent !== newSize) sizeEl.textContent = newSize;
+    if (buildTimeEl && buildTimeEl.textContent !== newBuildTime) buildTimeEl.textContent = newBuildTime;
+    if (timeEl && timeEl.textContent !== newTime) timeEl.textContent = newTime;
+    if (shaEl && shaEl.textContent !== newSha) shaEl.textContent = newSha;
   }
 }
 
@@ -806,6 +869,13 @@ function renderQrCode(url) {
   const container = document.getElementById("qrcodeCanvas");
   if (!container || !url) return;
 
+  if (container.getAttribute("data-qr-url") === url && container.children.length > 0) {
+    currentQrUrl = url;
+    return;
+  }
+
+  currentQrUrl = url;
+  container.setAttribute("data-qr-url", url);
   container.innerHTML = "";
 
   if (typeof QRCode !== "undefined") {
@@ -836,6 +906,12 @@ function renderHistory(historyList) {
   const navCount = document.getElementById("navHistoryCount");
   
   if (!container) return;
+
+  const currentHistorySig = historyList.map(item => `${item.id}_${item.sha256 || ''}_${item.download_url || ''}_${item.build_time || item.uploaded_at_formatted || ''}`).join("|");
+  if (lastRenderedHistorySignature === currentHistorySig && container.children.length > 0) {
+    return;
+  }
+  lastRenderedHistorySignature = currentHistorySig;
 
   if (countBadge) countBadge.textContent = `${historyList.length} Builds`;
   if (navCount) navCount.textContent = `${historyList.length}`;
@@ -903,6 +979,14 @@ function renderLogs(logs) {
 
   if (logs.length === 0) return;
 
+  const currentLogsSig = logs.join("\n");
+  if (lastRenderedLogsSignature === currentLogsSig && stream.children.length > 0) {
+    return;
+  }
+  lastRenderedLogsSignature = currentLogsSig;
+
+  const isScrolledToBottom = stream.scrollHeight - stream.clientHeight <= stream.scrollTop + 30;
+
   stream.innerHTML = logs.map(line => {
     let typeClass = "info";
     if (line.includes("[SUCCESS]") || line.includes("✓")) typeClass = "success";
@@ -915,7 +999,9 @@ function renderLogs(logs) {
     return `<div class="log-line ${typeClass}">${escapeHtml(cleanLine)}</div>`;
   }).join("");
 
-  stream.scrollTop = stream.scrollHeight;
+  if (isScrolledToBottom) {
+    stream.scrollTop = stream.scrollHeight;
+  }
 }
 
 async function toggleAutoWatch() {
